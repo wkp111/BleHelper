@@ -21,6 +21,7 @@ import android.os.Message;
 import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.annotation.RequiresApi;
 import android.support.v4.content.ContextCompat;
 
 import com.wkp.blehelper.activity.IInvisibleView;
@@ -53,7 +54,7 @@ import java.util.UUID;
 /**
  * Created by wkp on 2017/7/18.
  */
-
+@RequiresApi(api = Build.VERSION_CODES.M)
 public final class BleHelper {
     public static final int BLE_PERMISSION_RESULT_CODE = 520;
     private static final long SCAN_TIME_DEFAULT = 10000;
@@ -177,6 +178,7 @@ public final class BleHelper {
      * @param newState
      * @param gatt
      */
+
     private static void processOnConnectionStateChange(int status, int newState, BluetoothGatt gatt) {
         if (mConnectResponse == null) {
             return;
