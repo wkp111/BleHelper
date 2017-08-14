@@ -26,7 +26,7 @@ import java.util.List;
 import static com.wkp.blehelperdemo.BluetoothRelativeUtils.sendMsg;
 
 //api 21
-@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+@RequiresApi(api = Build.VERSION_CODES.M)
 public class MainActivity extends AppCompatActivity {
 
     private TextView mTextView;
