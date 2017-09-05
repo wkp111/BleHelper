@@ -188,11 +188,9 @@ public class MainActivity extends AppCompatActivity {
 ## 注意事项<br/>
 * 部分Android6.0以上手机扫描不到蓝牙设备，需要开启位置定位功能。<br/>
 <code>
-     /**
-     * 判断位置定位是否打开
-     * @param context
-     * @return
-     */
+        
+    //判断位置定位是否打开
+        
     public static final boolean isLocationEnable(Context context) {
         LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         boolean networkProvider = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
@@ -201,11 +199,11 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
         
-    /**
-     * 打开位置信息设置界面(回调onActivityResult方法)
-     */
+    //打开位置信息设置界面
+    
     private void setLocationService() {
         Intent locationIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-        startActivityForResult(locationIntent, 100);
+        this.startActivityForResult(locationIntent, REQUEST_CODE_LOCATION_SETTINGS);
     }
+    
 </code>
