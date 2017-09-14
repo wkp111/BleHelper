@@ -23,6 +23,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.RequiresApi;
 import android.support.v4.content.ContextCompat;
+import android.util.Log;
 
 import com.wkp.blehelper.activity.IInvisibleView;
 import com.wkp.blehelper.activity.InvisibleActivity;
@@ -107,6 +108,7 @@ public final class BleHelper {
     private static ScanAndConnectCallBack mConnectCallBack;
     private static String mServiceUUID;
     private static String mCharacteristicUUID;
+    private static String mNotifyUUID;
     private static byte[][] sDetachMsg;
     private static int writeCount = 0;
     private static NotifyLimit mNotifyLimit;
@@ -145,6 +147,7 @@ public final class BleHelper {
         mConnectCallBack = null;
         mServiceUUID = null;
         mCharacteristicUUID = null;
+        mNotifyUUID = null;
         sDetachMsg = null;
         writeCount = 0;
         mNotifyLimit = null;
@@ -235,7 +238,6 @@ public final class BleHelper {
         if (mConnectResponse == null) {
             return;
         }
-
         if (status != BluetoothGatt.GATT_SUCCESS) {
             mConnectResponse.status = SERVICE_STATE_DISCONNECTED;
             mConnectCallBack.onDiscoverServiceResult(mConnectResponse);
@@ -258,7 +260,8 @@ public final class BleHelper {
         }
 
         if (mIsNotify) {
-            boolean notification = gatt.setCharacteristicNotification(characteristic, true);
+            BluetoothGattCharacteristic notifyCharacteristic = service.getCharacteristic(UUID.fromString(mNotifyUUID));
+            boolean notification = gatt.setCharacteristicNotification(notifyCharacteristic, true);
             if (!notification) {
                 mConnectResponse.status = SERVICE_STATE_DISCONNECTED;
                 mConnectCallBack.onDiscoverServiceResult(mConnectResponse);
@@ -296,6 +299,7 @@ public final class BleHelper {
                 sDetachMsg = detachMsg(sendData);
                 writeCount = 0;
                 characteristic.setValue(sDetachMsg[writeCount]);
+                characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
                 boolean writeCharacteristic = gatt.writeCharacteristic(characteristic);
                 if (!writeCharacteristic) {
                     mConnectResponse.status = WRITE_STATE_FAILED;
@@ -322,7 +326,6 @@ public final class BleHelper {
         if (mConnectResponse == null) {
             return;
         }
-
         if (status != BluetoothGatt.GATT_SUCCESS) {
             CommonUtils.runInMainThread(new Runnable() {
                 @Override
@@ -337,6 +340,7 @@ public final class BleHelper {
         writeCount++;
         if (writeCount < sDetachMsg.length) {
             characteristic.setValue(sDetachMsg[writeCount]);
+            characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
             boolean writeCharacteristic = gatt.writeCharacteristic(characteristic);
             if (!writeCharacteristic) {
                 mConnectResponse.status = WRITE_STATE_FAILED;
@@ -420,7 +424,8 @@ public final class BleHelper {
                     gatt.disconnect();
                 } else {
                     if (doubleData.first) {
-                        sendData(gatt, characteristic, doubleData.second);
+                        BluetoothGattCharacteristic gattCharacteristic = gatt.getService(UUID.fromString(mServiceUUID)).getCharacteristic(UUID.fromString(mCharacteristicUUID));
+                        sendData(gatt, gattCharacteristic, doubleData.second);
                     }
                 }
             }
@@ -885,7 +890,7 @@ public final class BleHelper {
                     boolean scanBack = mScanCallBack.onScanBack(mScanResponse);
                     if (scanBack) {
                         connectAndWrite(mScanResponse.scanResult, mConnectData.connectTimeout, mConnectData.serviceUUID, mConnectData.characteristicUUID,
-                                mConnectData.notifyLimit, mConnectData.isNotify, false, mConnectData.callBack);
+                                mConnectData.notifyUUID,mConnectData.notifyLimit, mConnectData.isNotify, false, mConnectData.callBack);
                         sBluetoothAdapter.getBluetoothLeScanner().stopScan(this);
                         return;
                     }
@@ -893,7 +898,11 @@ public final class BleHelper {
                 if (mScanLimit.sort != null) {
                     Collections.sort(mScanResponse.results, mScanLimit.sort);
                 }
-                mScanCallBack.onScanBack(mScanResponse);
+                boolean scanBack = mScanCallBack.onScanBack(mScanResponse);
+                if (scanBack) {
+                    sBluetoothAdapter.getBluetoothLeScanner().stopScan(this);
+                    scanEnd();
+                }
             }
         }
 
@@ -917,7 +926,7 @@ public final class BleHelper {
         mScanResponse.status = SCAN_STATE_END;
         if (mScanLimit.isConnectResultFirst && mScanResponse.results.size() > 0 && !mScanLimit.isConnectScanFirst) {
             connectAndWrite(mScanResponse.results.get(0), mConnectData.connectTimeout, mConnectData.serviceUUID, mConnectData.characteristicUUID,
-                    mConnectData.notifyLimit, mConnectData.isNotify, false, mConnectData.callBack);
+                    mConnectData.notifyUUID,mConnectData.notifyLimit, mConnectData.isNotify, false, mConnectData.callBack);
         }
         mScanCallBack.onScanBack(mScanResponse);
         mScanResponse = null;
@@ -977,7 +986,21 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWrite(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID,
                                          @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, null, false, false, callBack);
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, characteristicUUID, null, false, false, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWrite(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID, String notifyUUID,
+                                         @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, notifyUUID, null, false, false, callBack);
     }
 
     /**
@@ -992,7 +1015,22 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWrite(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,
                                          @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID, null, false, false, callBack);
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID, characteristicUUID, null, false, false, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param timeout
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWrite(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                         @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID, notifyUUID, null, false, false, callBack);
     }
 
     /**
@@ -1007,7 +1045,22 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWrite(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID, boolean isAutoConnect,
                                          @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, null, false, isAutoConnect, callBack);
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, characteristicUUID, null, false, isAutoConnect, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param isAutoConnect
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWrite(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID,String notifyUUID, boolean isAutoConnect,
+                                         @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, notifyUUID, null, false, isAutoConnect, callBack);
     }
 
     /**
@@ -1023,7 +1076,23 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWrite(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,
                                          boolean isAutoConnect, @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID, null, false, isAutoConnect, callBack);
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID,characteristicUUID, null, false, isAutoConnect, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param timeout
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param isAutoConnect
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWrite(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                         boolean isAutoConnect, @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID,notifyUUID, null, false, isAutoConnect, callBack);
     }
 
     /**
@@ -1038,7 +1107,22 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID,
                                                boolean isNotify, @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, null, isNotify, false, callBack);
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, characteristicUUID, null, isNotify, false, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param isNotify
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                               boolean isNotify, @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, notifyUUID, null, isNotify, false, callBack);
     }
 
     /**
@@ -1054,7 +1138,23 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,
                                                boolean isNotify, @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID, null, isNotify, false, callBack);
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID,characteristicUUID, null, isNotify, false, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param timeout
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param isNotify
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                               boolean isNotify, @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID,notifyUUID, null, isNotify, false, callBack);
     }
 
     /**
@@ -1070,7 +1170,23 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID, boolean isNotify,
                                                boolean isAutoConnect, @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, null, isNotify, isAutoConnect, callBack);
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID,characteristicUUID, null, isNotify, isAutoConnect, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param isNotify
+     * @param isAutoConnect
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID,String notifyUUID, boolean isNotify,
+                                               boolean isAutoConnect, @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID,notifyUUID, null, isNotify, isAutoConnect, callBack);
     }
 
     /**
@@ -1087,7 +1203,24 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,
                                                boolean isNotify, boolean isAutoConnect, @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID, null, isNotify, isAutoConnect, callBack);
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID,characteristicUUID, null, isNotify, isAutoConnect, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param timeout
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param isNotify
+     * @param isAutoConnect
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                               boolean isNotify, boolean isAutoConnect, @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID,notifyUUID, null, isNotify, isAutoConnect, callBack);
     }
 
     /**
@@ -1102,7 +1235,22 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID,
                                                @NonNull NotifyLimit notifyLimit, @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, notifyLimit, true, false, callBack);
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID,characteristicUUID, notifyLimit, true, false, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param notifyLimit
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                               @NonNull NotifyLimit notifyLimit, @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID,notifyUUID, notifyLimit, true, false, callBack);
     }
 
     /**
@@ -1118,7 +1266,23 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,
                                                @NonNull NotifyLimit notifyLimit, @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID, notifyLimit, true, false, callBack);
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID,characteristicUUID, notifyLimit, true, false, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param timeout
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param notifyLimit
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                               @NonNull NotifyLimit notifyLimit, @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID,notifyUUID, notifyLimit, true, false, callBack);
     }
 
     /**
@@ -1134,7 +1298,23 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID,
                                                @NonNull NotifyLimit notifyLimit, boolean isAutoConnect, @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID, notifyLimit, true, isAutoConnect, callBack);
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID,characteristicUUID, notifyLimit, true, isAutoConnect, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param notifyLimit
+     * @param isAutoConnect
+     * @param callBack
+     * @return
+     */
+    public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                               @NonNull NotifyLimit notifyLimit, boolean isAutoConnect, @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, CONNECT_TIME_OUT_DEFAULT, serviceUUID, characteristicUUID,notifyUUID, notifyLimit, true, isAutoConnect, callBack);
     }
 
     /**
@@ -1151,7 +1331,24 @@ public final class BleHelper {
      */
     public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,
                                                @NonNull NotifyLimit notifyLimit, boolean isAutoConnect, @NonNull ConnectCallBack callBack) {
-        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID, notifyLimit, true, isAutoConnect, callBack);
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID,characteristicUUID, notifyLimit, true, isAutoConnect, callBack);
+    }
+
+    /**
+     * 连接通信
+     *
+     * @param scanResult         扫描到的设备
+     * @param timeout            超时时间
+     * @param serviceUUID        远程通信服务UUID
+     * @param characteristicUUID 远程通信特性UUID
+     * @param notifyLimit        对接收数据限制处理（主要用于并包处理）
+     * @param isAutoConnect      是否自动连接（中途断开时）
+     * @param callBack           通信任务回调
+     * @return 方便拓展
+     */
+    public BluetoothGatt connectAndWriteNotify(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                               @NonNull NotifyLimit notifyLimit, boolean isAutoConnect, @NonNull ConnectCallBack callBack) {
+        return connectAndWrite(scanResult, timeout, serviceUUID, characteristicUUID,notifyUUID, notifyLimit, true, isAutoConnect, callBack);
     }
 
     /**
@@ -1166,7 +1363,7 @@ public final class BleHelper {
      * @param callBack
      * @return
      */
-    private BluetoothGatt connectAndWrite(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID,
+    private BluetoothGatt connectAndWrite(@NonNull ScanResult scanResult, long timeout, String serviceUUID, String characteristicUUID, String notifyUUID,
                                           NotifyLimit notifyLimit, boolean isNotify, boolean isAutoConnect, @NonNull ScanAndConnectCallBack callBack) {
         if (mBluetoothGatt != null && mConnectResponse != null) {
             mConnectResponse.status = CONNECT_STATE_DISCONNECTED;
@@ -1177,6 +1374,7 @@ public final class BleHelper {
         mConnectCallBack = callBack;
         mServiceUUID = serviceUUID;
         mCharacteristicUUID = characteristicUUID;
+        mNotifyUUID = notifyUUID;
         mNotifyLimit = notifyLimit;
         mIsNotify = isNotify;
         mConnectResponse = new ConnectResponse();
@@ -1270,7 +1468,24 @@ public final class BleHelper {
      */
     public void scanFirstAndConnect(@Nullable List<String> nameFilters, long connectTimeout, String serviceUUID, String characteristicUUID,
                                     boolean isNotify, @Nullable Comparator<ScanResult> sort, @NonNull ScanAndConnectCallBack callBack) {
-        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID, null, isNotify, callBack);
+        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID,characteristicUUID, null, isNotify, callBack);
+        scanDevice(nameFilters, true, false, SCAN_TIME_DEFAULT, true, sort, callBack);
+    }
+
+    /**
+     * 扫描到第一个满足条件设备就连接
+     *
+     * @param nameFilters
+     * @param sort
+     * @param connectTimeout
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param isNotify           是否接收数据（接收的数据没有并包）
+     * @param callBack
+     */
+    public void scanFirstAndConnect(@Nullable List<String> nameFilters, long connectTimeout, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                    boolean isNotify, @Nullable Comparator<ScanResult> sort, @NonNull ScanAndConnectCallBack callBack) {
+        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID,notifyUUID, null, isNotify, callBack);
         scanDevice(nameFilters, true, false, SCAN_TIME_DEFAULT, true, sort, callBack);
     }
 
@@ -1287,7 +1502,24 @@ public final class BleHelper {
      */
     public void scanFirstAndConnect(@Nullable List<String> nameFilters, long connectTimeout, String serviceUUID, String characteristicUUID,
                                     @NonNull NotifyLimit notifyLimit, @Nullable Comparator<ScanResult> sort, @NonNull ScanAndConnectCallBack callBack) {
-        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID, notifyLimit, true, callBack);
+        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID,characteristicUUID, notifyLimit, true, callBack);
+        scanDevice(nameFilters, true, false, SCAN_TIME_DEFAULT, true, sort, callBack);
+    }
+
+    /**
+     * 扫描到第一个满足条件设备就连接
+     *
+     * @param nameFilters
+     * @param sort
+     * @param connectTimeout
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param notifyLimit        默认接收数据，并将接收数据并包处理
+     * @param callBack
+     */
+    public void scanFirstAndConnect(@Nullable List<String> nameFilters, long connectTimeout, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                    @NonNull NotifyLimit notifyLimit, @Nullable Comparator<ScanResult> sort, @NonNull ScanAndConnectCallBack callBack) {
+        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID,notifyUUID, notifyLimit, true, callBack);
         scanDevice(nameFilters, true, false, SCAN_TIME_DEFAULT, true, sort, callBack);
     }
 
@@ -1305,7 +1537,25 @@ public final class BleHelper {
      */
     public void scanAndConnectFirst(@Nullable List<String> nameFilters, long scanTime, long connectTimeout, String serviceUUID,
                                     String characteristicUUID, boolean isNotify, @Nullable Comparator<ScanResult> sort, @NonNull ScanAndConnectCallBack callBack) {
-        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID, null, isNotify, callBack);
+        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID,characteristicUUID, null, isNotify, callBack);
+        scanDevice(nameFilters, false, true, scanTime, true, sort, callBack);
+    }
+
+    /**
+     * 扫描完成并连接设备集合的第一个设备
+     *
+     * @param nameFilters
+     * @param sort
+     * @param scanTime
+     * @param connectTimeout
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param isNotify           是否接收数据（接收的数据没有并包）
+     * @param callBack
+     */
+    public void scanAndConnectFirst(@Nullable List<String> nameFilters, long scanTime, long connectTimeout, String serviceUUID, String characteristicUUID,
+                                    String notifyUUID, boolean isNotify, @Nullable Comparator<ScanResult> sort, @NonNull ScanAndConnectCallBack callBack) {
+        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID,notifyUUID, null, isNotify, callBack);
         scanDevice(nameFilters, false, true, scanTime, true, sort, callBack);
     }
 
@@ -1323,7 +1573,25 @@ public final class BleHelper {
      */
     public void scanAndConnectFirst(@Nullable List<String> nameFilters, long scanTime, long connectTimeout, String serviceUUID, String characteristicUUID,
                                     @NonNull NotifyLimit notifyLimit, @Nullable Comparator<ScanResult> sort, @NonNull ScanAndConnectCallBack callBack) {
-        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID, notifyLimit, true, callBack);
+        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID,characteristicUUID, notifyLimit, true, callBack);
+        scanDevice(nameFilters, false, true, scanTime, true, sort, callBack);
+    }
+
+    /**
+     * 扫描完成并连接设备集合的第一个设备
+     *
+     * @param nameFilters
+     * @param sort
+     * @param scanTime
+     * @param connectTimeout
+     * @param serviceUUID
+     * @param characteristicUUID
+     * @param notifyLimit        默认接收数据，并将接收数据并包处理
+     * @param callBack
+     */
+    public void scanAndConnectFirst(@Nullable List<String> nameFilters, long scanTime, long connectTimeout, String serviceUUID, String characteristicUUID,String notifyUUID,
+                                    @NonNull NotifyLimit notifyLimit, @Nullable Comparator<ScanResult> sort, @NonNull ScanAndConnectCallBack callBack) {
+        mConnectData = new ConnectData(connectTimeout, serviceUUID, characteristicUUID,notifyUUID, notifyLimit, true, callBack);
         scanDevice(nameFilters, false, true, scanTime, true, sort, callBack);
     }
 

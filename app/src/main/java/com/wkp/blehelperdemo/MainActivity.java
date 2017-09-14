@@ -7,22 +7,26 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import com.wkp.blehelper.bean.ConnectResponse;
 import com.wkp.blehelper.bean.DoubleData;
 import com.wkp.blehelper.bean.NotifyLimit;
 import com.wkp.blehelper.bean.ScanResponse;
 import com.wkp.blehelper.ble.BleHelper;
 import com.wkp.blehelper.callback.ScanAndConnectCallBack;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+
 import static com.wkp.blehelperdemo.BluetoothRelativeUtils.sendMsg;
 
 //api 21
@@ -71,13 +75,14 @@ public class MainActivity extends AppCompatActivity {
 
     public void scanConnect(View view) {
         final long start = System.currentTimeMillis();
+        final byte[] bytes = {(byte) 0xaa, (byte) 0xbb,0x03, (byte) 0x4a, (byte) 0xa0, (byte) 0xfc};
         //扫描过滤设备名（包含）
         List<String> nameFilters = new ArrayList<>();
-        nameFilters.add("pk");
+        nameFilters.add("pkm");
         //接收数据限制（主要用于并包）
         NotifyLimit notifyLimit = new NotifyLimit(BluetoothRelativeUtils.STX, BluetoothRelativeUtils.ETX, 2);
         //扫描时间   通信超时时间
-        mBleHelper.scanAndConnectFirst(nameFilters, 800, 5000, UUIDConstants.PEAKE_SERVICE_UUID, UUIDConstants.PEAKE_CHARACTER_UUID, notifyLimit, new Comparator<ScanResult>() {
+        mBleHelper.scanAndConnectFirst(nameFilters, 10000, 5000, UUIDConstants.PEAKE_SERVICE_UUID, UUIDConstants.PEAKE_CHARACTER_UUID, notifyLimit, new Comparator<ScanResult>() {
             //扫描设备排序
             @Override
             public int compare(ScanResult scanResult, ScanResult t1) {
@@ -132,6 +137,7 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     mTextView.setText("发现服务");
                     return sendMsg((byte) 0x8, AESUtils.cPassWord);
+//                    return bytes;
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -140,7 +146,7 @@ public class MainActivity extends AppCompatActivity {
             //发送成功回调，return true为结束通信；false为继续通信
             @Override
             public boolean onWriteResult(ConnectResponse connectResponse) {
-                mTextView.setText("发送完成");
+                mTextView.setText("发送完成"+connectResponse.status);
                 return false;
             }
             //接收数据回调，return false为不发送数据；true为发送数据；null为结束通信
@@ -148,6 +154,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public DoubleData<Boolean, byte[]> onNotifyResult(ConnectResponse connectResponse) {
                 byte[] notifyValue = connectResponse.notifyValue;
+                Log.d("MainActivity", "notifyValue:"+AESUtils.byteToHex(notifyValue));
                 byte[] inProcess = BluetoothRelativeUtils.PackInProcess(notifyValue);
                 if (inProcess.length >= 2 && inProcess[0] == 0x4) {
                     if (inProcess[1] == 0x00) {
