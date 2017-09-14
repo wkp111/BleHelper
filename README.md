@@ -3,7 +3,7 @@
 <br>
 <br>
 ## Gradle集成<br>
-compile 'com.wkp:BleHelper:1.0.5'
+compile 'com.wkp:BleHelper:1.0.6'
 <br>
 <br>
 ## 使用举例<br>
@@ -15,7 +15,7 @@ compile 'com.wkp:BleHelper:1.0.5'
 \<!--是否应用只用于具有Ble设备上--><br>
 `<uses-feature
         android:name="android.hardware.bluetooth_le"
-        android:required="false"/>`<br>
+        android:required="true"/>`<br>
 \<!--动态权限申请界面--><br>
 `<activity android:name="com.wkp.blehelper.activity.InvisibleActivity"/>`
 <br>
