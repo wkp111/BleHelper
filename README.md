@@ -210,10 +210,8 @@ Note：代码仅供参考，更多API请根据实际设定！
     }
 ```
 Note：也可以自己直接打开定位功能！
-
-<br/>
 ## 寄语<br/>
-控件支持直接代码创建，还有更多API请观看<a href="https://github.com/wkp111/BleHelper/blob/master/blehelper-lib/src/main/java/com/wkp/blehelper/ble/BleHelper.java">ExpandView.java</a>内的注释说明。<br/>
+控件支持直接代码创建，还有更多API请观看<a href="https://github.com/wkp111/BleHelper/blob/master/blehelper-lib/src/main/java/com/wkp/blehelper/ble/BleHelper.java">BleHelper.java</a>内的注释说明。<br/>
 欢迎大家使用，感觉好用请给个Star鼓励一下，谢谢！<br/>
 大家如果有更好的意见或建议以及好的灵感，请邮箱作者，谢谢！<br/>
 QQ邮箱：1535514884@qq.com<br/>
