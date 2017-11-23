@@ -1,31 +1,38 @@
-# BleHelper
+# BleHelper [ ![Download](https://api.bintray.com/packages/wkp/maven/BleHelper/images/download.svg) ](https://bintray.com/wkp/maven/BleHelper/_latestVersion)
 蓝牙通信帮助库
 <br>
 <br>
 ## Gradle集成<br>
-compile 'com.wkp:BleHelper:1.0.5'
-<br>
+```groovy
+
+dependencies{
+      compile 'com.wkp:BleHelper:1.0.6'
+      //Android Studio3.0+可用以下方式
+      //implementation 'com.wkp:BleHelper:1.0.6'
+} 
+```
+Note：可能存在Jcenter还在审核阶段，这时会集成失败！
 <br>
 ## 使用举例<br>
 1.manifest配置<br>
-\<!--权限配置--><br>
-`<uses-permission android:name="android.permission.BLUETOOTH"/>`<br>
-`<uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>`<br>
-`<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>`<br>
-\<!--是否应用只用于具有Ble设备上--><br>
-`<uses-feature
-        android:name="android.hardware.bluetooth_le"
-        android:required="false"/>`<br>
-\<!--动态权限申请界面--><br>
-`<activity android:name="com.wkp.blehelper.activity.InvisibleActivity"/>`
-<br>
+```xml
+        <!--权限配置--><br>
+        <uses-permission android:name="android.permission.BLUETOOTH"/>
+        <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+        <!--是否应用只用于具有Ble设备上--><br>
+        <uses-feature
+                android:name="android.hardware.bluetooth_le"
+                android:required="true"/>
+        <!--动态权限申请界面-->
+        <activity android:name="com.wkp.blehelper.activity.InvisibleActivity"/>
+```
+Note：内置权限申请界面为透明界面，不影响正常界面效果！
 <br>
 2.代码示例<br>
-<code>
+```java
 //api 21
-
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-
 public class MainActivity extends AppCompatActivity {
 
     private TextView mTextView;
@@ -183,14 +190,13 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 }
-</code>
+```
+Note：代码仅供参考，更多API请根据实际设定！
 
 ## 注意事项<br/>
 * 部分Android6.0以上手机扫描不到蓝牙设备，需要开启位置定位功能。<br/>
-<code>
-        
-    //判断位置定位是否打开
-        
+```java      
+    //判断位置定位是否打开   
     public static final boolean isLocationEnable(Context context) {
         LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         boolean networkProvider = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
@@ -200,10 +206,37 @@ public class MainActivity extends AppCompatActivity {
     }
         
     //打开位置信息设置界面
-    
     private void setLocationService() {
         Intent locationIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
         this.startActivityForResult(locationIntent, REQUEST_CODE_LOCATION_SETTINGS);
     }
-    
-</code>
+```
+Note：也可以自己直接打开定位功能！
+## 寄语<br/>
+控件支持直接代码创建，还有更多API请观看<a href="https://github.com/wkp111/BleHelper/blob/master/blehelper-lib/src/main/java/com/wkp/blehelper/ble/BleHelper.java">BleHelper.java</a>内的注释说明。<br/>
+欢迎大家使用，感觉好用请给个Star鼓励一下，谢谢！<br/>
+大家如果有更好的意见或建议以及好的灵感，请邮箱作者，谢谢！<br/>
+QQ邮箱：1535514884@qq.com<br/>
+163邮箱：15889686524@163.com<br/>
+Gmail邮箱：wkp15889686524@gmail.com<br/>
+
+## 版本更新<br/>
+* v1.0.6<br/>
+修复部分6.0以上手机扫描通信BUG<br/><br/>
+* v1.0.5<br/>
+新创建蓝牙4.0帮助库<br/>
+## License
+
+   Copyright 2017 wkp
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
