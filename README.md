@@ -6,30 +6,14 @@
 ```groovy
 
 dependencies{
-      compile 'com.wkp:BleHelper:1.0.6'
+      compile 'com.wkp:BleHelper:1.0.7'
       //Android Studio3.0+可用以下方式
-      //implementation 'com.wkp:BleHelper:1.0.6'
+      //implementation 'com.wkp:BleHelper:1.0.7'
 } 
 ```
 Note：可能存在Jcenter还在审核阶段，这时会集成失败！
 <br>
 ## 使用举例<br>
-1.manifest配置<br>
-```xml
-        <!--权限配置--><br>
-        <uses-permission android:name="android.permission.BLUETOOTH"/>
-        <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
-        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-        <!--是否应用只用于具有Ble设备上--><br>
-        <uses-feature
-                android:name="android.hardware.bluetooth_le"
-                android:required="true"/>
-        <!--动态权限申请界面-->
-        <activity android:name="com.wkp.blehelper.activity.InvisibleActivity"/>
-```
-Note：内置权限申请界面为透明界面，不影响正常界面效果！
-<br>
-2.代码示例<br>
 ```java
 //api 21
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
@@ -221,6 +205,8 @@ QQ邮箱：1535514884@qq.com<br/>
 Gmail邮箱：wkp15889686524@gmail.com<br/>
 
 ## 版本更新<br/>
+* v1.0.7<br/>
+内置动态权限申请界面，内置所需权限配置，无需再mainfest重新配置<br/><br/>
 * v1.0.6<br/>
 修复部分6.0以上手机扫描通信BUG<br/><br/>
 * v1.0.5<br/>
